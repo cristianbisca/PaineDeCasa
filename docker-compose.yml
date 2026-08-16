@@ -179,8 +179,8 @@ services:
     ports:
       - ${APP_PORT:-3000}:3000
     environment:
-      PUBLIC_REST_URL: ${PUBLIC_REST_URL}
-      PUBLIC_STORAGE_URL: ${PUBLIC_STORAGE_URL}
+      PUBLIC_REST_URL: ${PUBLIC_REST_URL:-http://localhost:3002}
+      PUBLIC_STORAGE_URL: ${PUBLIC_STORAGE_URL:-http://localhost:5000}
       ANON_KEY: ${ANON_KEY}
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
