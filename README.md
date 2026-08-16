@@ -20,7 +20,7 @@ Aplicatie mica pentru gestionarea comenzilor de paine artesana.
 | `studio`    | `supabase/studio` (dashboard optional)      |
 | `db-init` / `storage-init` | job-uri o singura data (schema + bucket) |
 
-Toata logica de afaceri (generezi cod, validari, PIN, RLS) e in bazo de date,
+Toata logica de afaceri (generezi cod, validari, PIN, RLS) e in baza de date,
 in functii SQL din `volumes/db/migrations/98-paine-de-casa.sql`.
 
 ## Pornire locala
@@ -30,7 +30,7 @@ cp .env.example .env      # apoi umple secreturile (vezi mai jos)
 docker compose up -d
 ```
 
-- Aplicatiie: http://localhost:3000
+- Aplicatie: http://localhost:3000
 - Panou brutar: http://localhost:3000/admin
 - API: http://localhost:3002
 - Storage: http://localhost:5000
@@ -38,18 +38,21 @@ docker compose up -d
 
 ### Secreturi
 
-Generezi o data o singura:
+Generezi o singura data cu:
 
 ```bash
-# JWT_SECRET (>=32 caractere)
-openssl rand -base64 36
-# ANON_KEY si SERVICE_ROLE_KEY: JWT-uri semnate HS256 cu JWT_SECRET.
-# Pe un proiect Supabase (managed) le gasesti in Dashboard -> Settings -> API.
+node tools/generate-secrets.mjs --domain https://<domeniu>
 ```
+
+Output-ul contine toate cheile (`POSTGRES_PASSWORD`, `JWT_SECRET`,
+`PG_META_CRYPTO_KEY`, `ANON_KEY`, `SERVICE_ROLE_KEY`, URL-urile publice si
+porturile) gata de pus in `.env` (local) sau in editorul de variabile Portainer.
+Fara `--domain` foloseste `localhost` (potrivit pentru dezvoltare).
 
 La prima pornire aplica un PIN aleator de 6 cifre pentru brutar.
 `POSTGRES_PASSWORD`, `PG_META_CRYPTO_KEY` si `JWT_SECRET` trebuie sa ramana
-stabile intre restarturi ca sa nu fii blocat.
+**stabile** intre restarturi — daca le schimbi, baza de date si cheile JWT
+nu mai functioneaza (trebuie reinitializate volumele).
 
 ### Afla PIN-ul initial
 
@@ -60,16 +63,93 @@ docker compose exec db psql -U postgres -d postgres \
 
 ## Deploy in Portainer (din git)
 
-1. Publica acest repo pe GitHub/GitLab.
-2. In Portainer: **Stacks -> Add stack -> Git**, pune URL-ul repoului.
-3. In secziua de variabile de mediu, define si valorile din `.env`
-   (`POSTGRES_PASSWORD`, `JWT_SECRET`, `PG_META_CRYPTO_KEY`,
-   `ANON_KEY`, `SERVICE_ROLE_KEY`, `PUBLIC_REST_URL`,
-   `PUBLIC_STORAGE_URL`, porturile).
-4. **Deploy the stack**.
+1. In Portainer: **Stacks -> Add stack -> Git** -> `https://github.com/cristianbisca/PaineDeCasa`.
+2. In editorul de **env variables** din Portainer, adauga exact aceaste chei:
 
-Pentru acces de pe telefon, `PUBLIC_REST_URL` si `PUBLIC_STORAGE_URL` trebuie
-sa fie adresa publica a serverului (ex: `http://<ip>:3002`), nu `localhost`.
+   | Cheie | Din |
+   |-------|-----|
+   | `POSTGRES_PASSWORD` | `node tools/generate-secrets.mjs` |
+   | `JWT_SECRET` | idem |
+   | `JWT_EXPIRY` | `3600` |
+   | `PG_META_CRYPTO_KEY` | idem |
+   | `ANON_KEY` | idem |
+   | `SERVICE_ROLE_KEY` | idem |
+   | `PUBLIC_REST_URL` | `https://<domeniu>/rest` (vezi nginx) |
+   | `PUBLIC_STORAGE_URL` | `https://<domeniu>/storage` |
+   | `APP_PORT` / `REST_PORT` / `STORAGE_PORT` / `STUDIO_PORT` | `3000` / `3002` / `5000` / `8080` |
+
+   `POSTGRES_PASSWORD`, `JWT_SECRET` si `PG_META_CRYPTO_KEY` trebuie sa ramana
+   **stabile** intre restarturi (schimbarea lor blocheaza baza de date).
+3. **Deploy the stack** (Portainer face clone + build automat).
+
+## nginx (reverse proxy)
+
+Aplicatia, API-ul si storage-ul raman pe porturile lor; nginx le expune pe un
+singur domeniu, cu HTTPS. `PUBLIC_REST_URL` / `PUBLIC_STORAGE_URL` trebuie sa
+fie adresele publice cu sufixele `/rest` si `/storage`:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name paine.example.ro;
+
+    ssl_certificate     /etc/letsencrypt/live/paine.example.ro/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/paine.example.ro/privkey.pem;
+
+    client_max_body_size 60m;   # incarcarea pozelor
+
+    # API PostgREST
+    location /rest/ {
+        proxy_pass http://127.0.0.1:3002/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Storage (poze paini)
+    location /storage/ {
+        proxy_pass http://127.0.0.1:5000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Aplicatia
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+Studio nu poate rula sub un sub-path (foloseste rute absolute), asa ca ii dai
+un hostname propriu, de ex. `https://studio.paine.example.ro`:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name studio.paine.example.ro;
+    # ssl_certificate ... (acelas certificat)
+
+    # Doar de pe IP-urile tale — e dashboard-ul bazei de date:
+    allow 1.2.3.4;        # IP-ul tau
+    deny  all;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Daca nu vrei Studio deloc, il elimini din `docker-compose.yml` (service-ul
+`studio`) si nu mai expui portul 8080.
+
+In firewall lasa deschise doar 443/80; porturile `3000/3002/5000/8080` raman
+doar pentru nginx (local).
 
 ### Note importante
 
