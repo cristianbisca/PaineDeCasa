@@ -26,6 +26,7 @@ export interface OrderInfo {
   items: OrderItem[];
   total: number;
   created_at: string;
+  accepted_at: string | null;
   delivered_at: string | null;
 }
 

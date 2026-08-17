@@ -7,7 +7,9 @@ import { rpc } from "@/lib/api";
 import { formatDate, formatLei } from "@/lib/format";
 import type { OrderInfo } from "@/lib/types";
 
-type StatusData = OrderInfo & { status: "pending" | "delivered" };
+type StatusData = OrderInfo & {
+  status: "pending" | "accepted" | "delivered";
+};
 
 export default function OrderStatusPage() {
   const pathname = usePathname();
@@ -68,22 +70,27 @@ export default function OrderStatusPage() {
   }
 
   const delivered = data.status === "delivered";
+  const accepted = data.status === "accepted";
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-6 py-10">
       <div
         className={`rounded-3xl p-8 text-center ${
-          delivered ? "bg-green-600" : "bg-amber-500"
+          delivered ? "bg-green-600" : accepted ? "bg-sky-600" : "bg-amber-500"
         } text-white`}
       >
-        <div className="text-4xl">{delivered ? "✅" : "⏳"}</div>
+        <div className="text-4xl">
+          {delivered ? "✅" : accepted ? "🍞" : "⏳"}
+        </div>
         <h1 className="mt-3 text-2xl font-bold">
-          {delivered ? "Livrata!" : "In asteptare"}
+          {delivered ? "Livrata!" : accepted ? "Preluata!" : "In asteptare"}
         </h1>
         <p className="mt-1 text-sm opacity-90">
           {delivered
             ? `Livrata pe ${formatDate(data.delivered_at)}`
-            : "Painea ta urmeaza sa fie preparata si livrata."}
+            : accepted
+              ? "Brutarul a vazut comanda. O pregatim pentru livrare."
+              : "Painea ta urmeaza sa fie preparata si livrata."}
         </p>
       </div>
 
@@ -100,6 +107,11 @@ export default function OrderStatusPage() {
           </div>
           <div className="mt-1 text-sm text-stone-600">{data.address}</div>
         </div>
+        {data.accepted_at ? (
+          <div className="mt-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-800">
+            Preluata de brutar pe {formatDate(data.accepted_at)}.
+          </div>
+        ) : null}
         {data.notes ? (
           <div className="mt-3 rounded-xl bg-stone-50 px-3 py-2 text-sm text-stone-600">
             {data.notes}

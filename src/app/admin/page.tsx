@@ -111,6 +111,18 @@ export default function AdminPage() {
     setTab("orders");
   };
 
+  const markAccepted = async (order: OrderInfo) => {
+    setBusy(true);
+    setMsg(null);
+    const { error } = await rpc<unknown>("mark_accepted", {
+      p_code: order.code,
+      p_pin: sessionPin,
+    });
+    if (error) setMsg(error);
+    setBusy(false);
+    await refresh();
+  };
+
   const markDelivered = async (order: OrderInfo) => {
     setBusy(true);
     setMsg(null);
@@ -230,6 +242,11 @@ export default function AdminPage() {
     return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], "ro"));
   }, [data]);
 
+  const acceptedCount = useMemo(
+    () => (data?.pending ?? []).filter((o) => o.accepted_at).length,
+    [data]
+  );
+
   const deliveredToday = useMemo(
     () => (data?.delivered ?? []).filter((o) => isToday(o.delivered_at)).length,
     [data]
@@ -297,7 +314,8 @@ export default function AdminPage() {
         <div>
           <h1 className="text-xl font-bold text-stone-900">Panou brutar</h1>
           <p className="text-sm text-stone-500">
-            {data.pending.length} în așteptare · {deliveredToday} livrate azi
+            {data.pending.length - acceptedCount} în așteptare ·{" "}
+            {acceptedCount} preluate · {deliveredToday} livrate azi
           </p>
         </div>
         <button
@@ -379,10 +397,16 @@ export default function AdminPage() {
                         className={
                           o.delivered_at
                             ? "text-green-700"
-                            : "text-amber-700"
+                            : o.accepted_at
+                              ? "text-sky-700"
+                              : "text-amber-700"
                         }
                       >
-                        {o.delivered_at ? "Livrata" : "In asteptare"}
+                        {o.delivered_at
+                          ? "Livrata"
+                          : o.accepted_at
+                            ? "Preluata"
+                            : "In asteptare"}
                       </span>
                     </div>
                   ))}
@@ -393,7 +417,7 @@ export default function AdminPage() {
 
           {grouped.length === 0 ? (
             <div className="rounded-2xl bg-white px-4 py-10 text-center text-stone-500">
-              Nicio comandă în așteptare. 🎉
+              Nicio comandă deschisă. 🎉
             </div>
           ) : (
             grouped.map(([street, orders]) => (
@@ -432,6 +456,19 @@ export default function AdminPage() {
                           <div className="font-bold text-amber-700">
                             {formatLei(o.total)}
                           </div>
+                          {o.accepted_at ? (
+                            <div className="mt-2 text-xs font-semibold text-sky-700">
+                              Preluata la {formatDate(o.accepted_at)}
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => markAccepted(o)}
+                              disabled={busy}
+                              className="mt-2 rounded-xl bg-sky-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                            >
+                              Preluata
+                            </button>
+                          )}
                           <button
                             onClick={() => markDelivered(o)}
                             disabled={busy}
