@@ -8,7 +8,7 @@ import { formatDate, formatLei } from "@/lib/format";
 import type { OrderInfo } from "@/lib/types";
 
 type StatusData = OrderInfo & {
-  status: "pending" | "accepted" | "delivered";
+  status: "pending" | "accepted" | "delivered" | "cancelled";
 };
 
 export default function OrderStatusPage() {
@@ -70,27 +70,42 @@ export default function OrderStatusPage() {
   }
 
   const delivered = data.status === "delivered";
+  const cancelled = data.status === "cancelled";
   const accepted = data.status === "accepted";
 
   return (
     <main className="mx-auto w-full max-w-md flex-1 px-6 py-10">
       <div
         className={`rounded-3xl p-8 text-center ${
-          delivered ? "bg-green-600" : accepted ? "bg-sky-600" : "bg-amber-500"
+          delivered
+            ? "bg-green-600"
+            : cancelled
+              ? "bg-stone-700"
+              : accepted
+                ? "bg-sky-600"
+                : "bg-amber-500"
         } text-white`}
       >
         <div className="text-4xl">
-          {delivered ? "✅" : accepted ? "🍞" : "⏳"}
+          {delivered ? "✅" : cancelled ? "✖" : accepted ? "🍞" : "⏳"}
         </div>
         <h1 className="mt-3 text-2xl font-bold">
-          {delivered ? "Livrata!" : accepted ? "Preluata!" : "In asteptare"}
+          {delivered
+            ? "Livrata!"
+            : cancelled
+              ? "Comanda anulata"
+              : accepted
+                ? "Preluata!"
+                : "In asteptare"}
         </h1>
         <p className="mt-1 text-sm opacity-90">
           {delivered
             ? `Livrata pe ${formatDate(data.delivered_at)}`
-            : accepted
-              ? "Brutarul a vazut comanda. O pregatim pentru livrare."
-              : "Painea ta urmeaza sa fie preparata si livrata."}
+            : cancelled
+              ? "Brutarul a anulat comanda. Te rugam sa ne suni pentru detalii."
+              : accepted
+                ? "Brutarul a vazut comanda. O pregatim pentru livrare."
+                : "Painea ta urmeaza sa fie preparata si livrata."}
         </p>
       </div>
 

@@ -26,11 +26,13 @@ create table if not exists public.orders (
   total numeric(10, 2) not null default 0,
   created_at timestamptz not null default now(),
   accepted_at timestamptz,
-  delivered_at timestamptz
+  delivered_at timestamptz,
+  cancelled_at timestamptz
 );
 
 -- pentru bazele deja initializate (create table if not exists nu ii modifica)
 alter table public.orders add column if not exists accepted_at timestamptz;
+alter table public.orders add column if not exists cancelled_at timestamptz;
 alter table public.breads add column if not exists available_in_tava boolean not null default true;
 
 create unique index if not exists orders_code_uq on public.orders (code);
@@ -179,8 +181,10 @@ as $$
     'created_at', o.created_at,
     'accepted_at', o.accepted_at,
     'delivered_at', o.delivered_at,
+    'cancelled_at', o.cancelled_at,
     'status', case
       when o.delivered_at is not null then 'delivered'
+      when o.cancelled_at is not null then 'cancelled'
       when o.accepted_at is not null then 'accepted'
       else 'pending'
     end
@@ -231,31 +235,34 @@ begin
         select coalesce(jsonb_object_agg(t.name, t.qty), '{}'::jsonb)
         from (
           select b.name as name, sum((i ->> 'qty')::int) as qty
-          from orders o
-          cross join jsonb_array_elements(o.items) i
-          join breads b on b.id = (i ->> 'bread_id')::uuid
-          where o.delivered_at is null
-          group by b.name
-        ) t
-      ),
-      'production_tava', (
+      from orders o
+      cross join jsonb_array_elements(o.items) i
+      join breads b on b.id = (i ->> 'bread_id')::uuid
+      where o.delivered_at is null
+        and o.cancelled_at is null
+      group by b.name
+    ) t
+  ),
+  'production_tava', (
         select coalesce(jsonb_object_agg(t.name, t.qty), '{}'::jsonb)
         from (
           select b.name as name, sum((i ->> 'qty')::int) as qty
-          from orders o
-          cross join jsonb_array_elements(o.items) i
-          join breads b on b.id = (i ->> 'bread_id')::uuid
-          where o.delivered_at is null
-            and (i ->> 'la_tava') = 'true'
-          group by b.name
-        ) t
-      ),
+      from orders o
+      cross join jsonb_array_elements(o.items) i
+      join breads b on b.id = (i ->> 'bread_id')::uuid
+      where o.delivered_at is null
+        and o.cancelled_at is null
+        and (i ->> 'la_tava') = 'true'
+      group by b.name
+    ) t
+  ),
       'pending', (
         select coalesce(jsonb_agg(t), '[]'::jsonb)
         from (
           select o.code, o.name, o.phone, o.address, o.notes, o.items, o.total, o.created_at, o.accepted_at
           from orders o
           where o.delivered_at is null
+            and o.cancelled_at is null
           order by o.created_at asc
         ) t
       ),
@@ -298,7 +305,8 @@ begin
   set accepted_at = now()
   where code = upper(trim(coalesce(p_code, '')))
     and accepted_at is null
-    and delivered_at is null;
+    and delivered_at is null
+    and cancelled_at is null;
 
   if not found then
     raise exception 'COMANDA_INEGASITA: Comanda nu mai este in asteptare.';
@@ -324,10 +332,40 @@ begin
 
   update orders
   set delivered_at = now()
-  where code = upper(trim(coalesce(p_code, ''))) and delivered_at is null;
+  where code = upper(trim(coalesce(p_code, '')))
+    and delivered_at is null
+    and cancelled_at is null;
 
   if not found then
     raise exception 'COMANDA_INEGASITA: Nu exista nicio comanda in asteptare cu acest cod.';
+  end if;
+end;
+$$;
+
+create or replace function public.cancel_order(p_code text, p_pin text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  v_pin text;
+begin
+  select value into v_pin from app_config where key = 'baker_pin';
+  if p_pin is null or p_pin <> v_pin then
+    perform pg_sleep(1);
+    raise exception 'PIN_GRESIT';
+  end if;
+
+  update orders
+  set cancelled_at = now()
+  where code = upper(trim(coalesce(p_code, '')))
+    and delivered_at is null
+    and cancelled_at is null;
+
+  if not found then
+    raise exception 'COMANDA_INEGASITA: Comanda nu poate fi anulata (nu exista, este livrata sau a fost deja anulata).';
   end if;
 end;
 $$;
@@ -351,7 +389,7 @@ begin
   return (
     select coalesce(jsonb_agg(t), '[]'::jsonb)
     from (
-      select o.code, o.name, o.phone, o.address, o.notes, o.items, o.total, o.created_at, o.accepted_at, o.delivered_at
+      select o.code, o.name, o.phone, o.address, o.notes, o.items, o.total, o.created_at, o.accepted_at, o.delivered_at, o.cancelled_at
       from orders o
       where o.phone like '%' || coalesce(p_phone, '') || '%'
       order by o.created_at desc

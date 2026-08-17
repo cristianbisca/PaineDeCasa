@@ -30,6 +30,7 @@ export interface OrderInfo {
   created_at: string;
   accepted_at: string | null;
   delivered_at: string | null;
+  cancelled_at: string | null;
 }
 
 export interface PublicConfig {

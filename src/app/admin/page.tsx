@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [searchPhone, setSearchPhone] = useState("");
   const [searchResults, setSearchResults] = useState<OrderInfo[] | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<OrderInfo | null>(null);
 
   // catalog form
   const [editing, setEditing] = useState<Bread | "new" | null>(null);
@@ -131,6 +132,19 @@ export default function AdminPage() {
       p_code: order.code,
       p_pin: sessionPin,
     });
+    if (error) setMsg(error);
+    setBusy(false);
+    await refresh();
+  };
+
+  const cancelOrder = async (order: OrderInfo) => {
+    setBusy(true);
+    setMsg(null);
+    const { error } = await rpc<unknown>("cancel_order", {
+      p_code: order.code,
+      p_pin: sessionPin,
+    });
+    setCancelTarget(null);
     if (error) setMsg(error);
     setBusy(false);
     await refresh();
@@ -401,16 +415,20 @@ export default function AdminPage() {
                         className={
                           o.delivered_at
                             ? "text-green-700"
-                            : o.accepted_at
-                              ? "text-sky-700"
-                              : "text-amber-700"
+                            : o.cancelled_at
+                              ? "text-red-700"
+                              : o.accepted_at
+                                ? "text-sky-700"
+                                : "text-amber-700"
                         }
                       >
                         {o.delivered_at
                           ? "Livrata"
-                          : o.accepted_at
-                            ? "Preluata"
-                            : "In asteptare"}
+                          : o.cancelled_at
+                            ? "Anulata"
+                            : o.accepted_at
+                              ? "Preluata"
+                              : "In asteptare"}
                       </span>
                     </div>
                   ))}
@@ -479,6 +497,13 @@ export default function AdminPage() {
                             className="mt-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
                           >
                             Livrata
+                          </button>
+                          <button
+                            onClick={() => setCancelTarget(o)}
+                            disabled={busy}
+                            className="mt-6 rounded-xl border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-600 disabled:opacity-50"
+                          >
+                            Anulează comanda
                           </button>
                         </div>
                       </div>
@@ -789,6 +814,46 @@ export default function AdminPage() {
             Salvează setările
           </button>
         </section>
+      ) : null}
+
+      {cancelTarget ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/50 p-4"
+          onClick={() => !busy && setCancelTarget(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl bg-white p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-stone-900">
+              Anulează comanda?
+            </h3>
+            <p className="mt-2 text-sm text-stone-600">
+              Comanda{" "}
+              <span className="font-mono font-bold">
+                {cancelTarget.code}
+              </span>{" "}
+              pentru {cancelTarget.name} ({formatLei(cancelTarget.total)}) va fi
+              anulata si nu vei mai putea o modifica.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                onClick={() => setCancelTarget(null)}
+                disabled={busy}
+                className="flex-1 rounded-xl border border-stone-300 px-4 py-3 font-semibold disabled:opacity-50"
+              >
+                Renunță
+              </button>
+              <button
+                onClick={() => cancelOrder(cancelTarget)}
+                disabled={busy}
+                className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-semibold text-white disabled:opacity-50"
+              >
+                {busy ? "Se anulează..." : "Anulează"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </main>
   );
