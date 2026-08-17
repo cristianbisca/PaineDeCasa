@@ -834,7 +834,7 @@ export default function AdminPage() {
                 {cancelTarget.code}
               </span>{" "}
               pentru {cancelTarget.name} ({formatLei(cancelTarget.total)}) va fi
-              anulata si nu vei mai putea o modifica.
+              anulata si nu o vei mai putea modifica.
             </p>
             <div className="mt-5 flex gap-3">
               <button
