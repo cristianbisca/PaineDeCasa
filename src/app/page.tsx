@@ -29,16 +29,39 @@ export default function Home() {
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placedCode, setPlacedCode] = useState<string | null>(null);
-  const [lastCode, setLastCode] = useState<string | null>(null);
+  const [orderCodes, setOrderCodes] = useState<string[]>([]);
 
   useEffect(() => {
     try {
-      const stored = window.localStorage.getItem("pdc_last_code");
-      if (stored) setLastCode(stored);
+      const stored = window.localStorage.getItem("pdc_order_codes");
+      if (stored) {
+        const parsed: unknown = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setOrderCodes(parsed.filter((c): c is string => typeof c === "string"));
+        }
+      } else {
+        const legacy = window.localStorage.getItem("pdc_last_code");
+        if (legacy) {
+          setOrderCodes([legacy]);
+          window.localStorage.removeItem("pdc_last_code");
+        }
+      }
     } catch {
       // localStorage indisponibil
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      if (orderCodes.length > 0) {
+        window.localStorage.setItem("pdc_order_codes", JSON.stringify(orderCodes));
+      } else {
+        window.localStorage.removeItem("pdc_order_codes");
+      }
+    } catch {
+      // localStorage indisponibil
+    }
+  }, [orderCodes]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,12 +195,9 @@ export default function Home() {
       setPlacing(false);
       return;
     }
-    try {
-      window.localStorage.setItem("pdc_last_code", data.code);
-      setLastCode(data.code);
-    } catch {
-      // ignor
-    }
+    setOrderCodes((prev) =>
+      [data.code, ...prev.filter((c) => c !== data.code)].slice(0, 20)
+    );
     setPlacedCode(data.code);
     setPlacing(false);
   };
@@ -210,31 +230,43 @@ export default function Home() {
         </div>
       ) : null}
 
-      {lastCode ? (
-        <div className="mb-6 flex items-center justify-between rounded-2xl border border-stone-200 bg-white px-4 py-3">
-          <div className="text-sm text-stone-600">
-            Comanda ta:{" "}
-            <Link
-              href={`/o/${lastCode}`}
-              className="font-mono font-bold text-stone-900 underline"
+      {orderCodes.length > 0 ? (
+        <div className="mb-6 rounded-2xl border border-stone-200 bg-white px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="text-sm font-semibold text-stone-600">
+              {orderCodes.length === 1
+                ? "Comanda ta:"
+                : "Comenzile tale:"}
+            </div>
+            <button
+              onClick={() => setOrderCodes([])}
+              className="text-sm text-stone-400"
+              aria-label="Sterge lista comenzilor"
             >
-              {lastCode}
-            </Link>
+              ✕
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setLastCode(null);
-              try {
-                window.localStorage.removeItem("pdc_last_code");
-              } catch {
-                // ignor
-              }
-            }}
-            className="text-sm text-stone-400"
-            aria-label="Ascunde codul ultimei comenzi"
-          >
-            ✕
-          </button>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            {orderCodes.map((c) => (
+              <span key={c} className="inline-flex items-center gap-1">
+                <Link
+                  href={`/o/${c}`}
+                  className="font-mono font-bold text-stone-900 underline"
+                >
+                  {c}
+                </Link>
+                <button
+                  onClick={() =>
+                    setOrderCodes((prev) => prev.filter((x) => x !== c))
+                  }
+                  className="text-xs text-stone-400 hover:text-stone-600"
+                  aria-label={`Sterge comanda ${c}`}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
       ) : null}
 
