@@ -1,0 +1,2 @@
+# This file keeps the public/ directory tracked by git (git ignores empty dirs).
+# The Dockerfile COPYs this directory, so it must exist on fresh clones.
