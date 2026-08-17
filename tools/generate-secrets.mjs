@@ -29,7 +29,6 @@ const lines = [
   "POSTGRES_PASSWORD=" + b64url(randomBytes(24)),
   "JWT_SECRET=" + jwtSecret,
   "JWT_EXPIRY=3600",
-  "PG_META_CRYPTO_KEY=" + randomBytes(36).toString("base64"),
   "ANON_KEY=" + signJwt({ role: "anon", iss: "painedecasa", iat: now, exp: tenYears }),
   "SERVICE_ROLE_KEY=" +
     signJwt({ role: "service_role", iss: "painedecasa", iat: now, exp: tenYears }),
@@ -44,10 +43,15 @@ if (domain) {
     `PUBLIC_STORAGE_URL=${domain}/storage`
   );
 } else {
-  lines.push("PUBLIC_REST_URL=http://localhost:3002");
-  lines.push("PUBLIC_STORAGE_URL=http://localhost:5000");
+  lines.push("PUBLIC_REST_URL=http://localhost:4502");
+  lines.push("PUBLIC_STORAGE_URL=http://localhost:4510");
 }
 
-lines.push("APP_PORT=3000", "REST_PORT=3002", "STORAGE_PORT=5000", "STUDIO_PORT=8080");
+lines.push(
+  "APP_PORT=4500",
+  "REST_PORT=4502",
+  "STORAGE_PORT=4510",
+  "DB_PORT=4532"
+);
 
 process.stdout.write(lines.join("\n") + "\n");
