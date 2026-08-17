@@ -25,6 +25,7 @@ export default function Home() {
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
   const [qtys, setQtys] = useState<Record<string, number>>({});
+  const [taves, setTaves] = useState<Record<string, boolean>>({});
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [placedCode, setPlacedCode] = useState<string | null>(null);
@@ -141,15 +142,24 @@ export default function Home() {
     );
   }
 
-  const setQty = (id: string, v: number) =>
-    setQtys((p) => ({ ...p, [id]: Math.max(0, Math.min(99, v)) }));
+  const setQty = (id: string, v: number) => {
+    const q = Math.max(0, Math.min(99, v));
+    setQtys((p) => ({ ...p, [id]: q }));
+    if (q === 0) setTaves((p) => ({ ...p, [id]: false }));
+  };
+
+  const setTava = (id: string, v: boolean) => setTaves((p) => ({ ...p, [id]: v }));
 
   const submit = async () => {
     setError(null);
     setPlacing(true);
     const items = breads
       .filter((b) => (qtys[b.id] ?? 0) > 0)
-      .map((b) => ({ bread_id: b.id, qty: qtys[b.id] }));
+      .map((b) => ({
+        bread_id: b.id,
+        qty: qtys[b.id],
+        la_tava: !!(taves[b.id] && b.available_in_tava !== false),
+      }));
     const { data, error: e } = await rpc<{ code: string }>("place_order", {
       p_name: name,
       p_phone: phone,
@@ -267,6 +277,20 @@ export default function Home() {
                 <div className="mt-1 font-semibold text-amber-700">
                   {formatLei(b.price)}
                 </div>
+                {q > 0 && b.available_in_tava !== false ? (
+                  <button
+                    onClick={() => setTava(b.id, !(taves[b.id] ?? false))}
+                    disabled={!config.ordering_open}
+                    aria-pressed={!!taves[b.id]}
+                    className={`mt-1.5 rounded-full px-3 py-1 text-xs font-semibold disabled:opacity-40 ${
+                      taves[b.id]
+                        ? "bg-amber-600 text-white"
+                        : "border border-stone-300 text-stone-500"
+                    }`}
+                  >
+                    {taves[b.id] ? "Paine la tava ✓" : "Paine la tava?"}
+                  </button>
+                ) : null}
               </div>
               <div className="flex shrink-0 flex-col items-center">
                 <div className="flex items-center gap-2">

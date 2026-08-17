@@ -28,6 +28,7 @@ export default function AdminPage() {
   const [fDesc, setFDesc] = useState("");
   const [fWeight, setFWeight] = useState("");
   const [fPrice, setFPrice] = useState("");
+  const [fTava, setFTava] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // settings
@@ -155,11 +156,13 @@ export default function AdminPage() {
       setFDesc("");
       setFWeight("");
       setFPrice("");
+      setFTava(true);
     } else {
       setFName(b.name);
       setFDesc(b.description);
       setFWeight(String(b.weight_g || ""));
       setFPrice(String(b.price));
+      setFTava(b.available_in_tava !== false);
     }
     setMsg(null);
   };
@@ -188,6 +191,7 @@ export default function AdminPage() {
       p_weight_g: parseInt(fWeight, 10) || 0,
       p_price: isNaN(price) ? 0 : price,
       p_photo_url: photoUrl,
+      p_available_in_tava: fTava,
     });
     if (error) {
       setMsg(error);
@@ -486,6 +490,11 @@ export default function AdminPage() {
                           >
                             <span>
                               {it.name} × {it.qty}
+                              {it.la_tava ? (
+                                <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                  la tavă
+                                </span>
+                              ) : null}
                             </span>
                             <span className="text-stone-500">
                               {formatLei(it.row_total)}
@@ -547,11 +556,18 @@ export default function AdminPage() {
                     className="flex items-center justify-between rounded-2xl bg-amber-50 px-4 py-3"
                   >
                     <span className="font-semibold">{b.name}</span>
-                    <span className="text-2xl font-bold text-amber-800">
-                      {data.production[b.name]}
-                      <span className="ml-1 text-sm font-normal text-stone-500">
-                        buc.
+                    <span className="text-right">
+                      <span className="text-2xl font-bold text-amber-800">
+                        {data.production[b.name]}
+                        <span className="ml-1 text-sm font-normal text-stone-500">
+                          buc.
+                        </span>
                       </span>
+                      {(data.production_tava[b.name] ?? 0) > 0 ? (
+                        <span className="block text-xs text-stone-600">
+                          din care {data.production_tava[b.name]} la tavă
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                 ))}
@@ -596,13 +612,20 @@ export default function AdminPage() {
                     🍞
                   </div>
                 )}
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold">{b.name}</div>
-                  <div className="text-sm text-stone-500">
-                    {formatLei(b.price)}
-                    {b.weight_g > 0 ? ` · ${b.weight_g} g` : ""}
-                  </div>
-                </div>
+                 <div className="min-w-0 flex-1">
+                   <div className="font-semibold">
+                     {b.name}
+                     {b.available_in_tava === false ? (
+                       <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-500">
+                         fără la tavă
+                       </span>
+                     ) : null}
+                   </div>
+                   <div className="text-sm text-stone-500">
+                     {formatLei(b.price)}
+                     {b.weight_g > 0 ? ` · ${b.weight_g} g` : ""}
+                   </div>
+                 </div>
                 <button
                   onClick={() => toggleActive(b)}
                   disabled={busy}
@@ -660,6 +683,23 @@ export default function AdminPage() {
                     onChange={(e) => setFPrice(e.target.value)}
                   />
                 </div>
+                <label className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="block text-sm font-semibold">
+                      Paine la tavă
+                    </span>
+                    <span className="block text-xs text-stone-500">
+                      Clientul poate comanda aceasta paine și la tavă (același
+                      preț).
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={fTava}
+                    onChange={(e) => setFTava(e.target.checked)}
+                    className="h-6 w-6 shrink-0 accent-amber-600"
+                  />
+                </label>
                 <label className="block text-sm font-semibold">
                   Fotografie
                   <input

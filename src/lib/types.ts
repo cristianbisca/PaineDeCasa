@@ -6,6 +6,7 @@ export interface Bread {
   price: number;
   photo_url: string | null;
   active: boolean;
+  available_in_tava: boolean;
   created_at: string;
 }
 
@@ -14,6 +15,7 @@ export interface OrderItem {
   name: string;
   price: number;
   qty: number;
+  la_tava?: boolean;
   row_total: number;
 }
 
@@ -46,6 +48,7 @@ export interface AdminData {
   banner: string | null;
   ordering_open: boolean;
   production: Record<string, number>;
+  production_tava: Record<string, number>;
   pending: OrderInfo[];
   delivered: DeliveredOrder[];
   breads: Bread[];

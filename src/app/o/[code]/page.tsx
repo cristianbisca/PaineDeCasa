@@ -122,6 +122,11 @@ export default function OrderStatusPage() {
             <div key={it.bread_id} className="flex justify-between text-sm">
               <span>
                 {it.name} × {it.qty}
+                {it.la_tava ? (
+                  <span className="ml-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    la tavă
+                  </span>
+                ) : null}
               </span>
               <span className="font-semibold">{formatLei(it.row_total)}</span>
             </div>

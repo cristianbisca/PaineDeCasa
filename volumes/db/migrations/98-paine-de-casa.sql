@@ -11,6 +11,7 @@ create table if not exists public.breads (
   price numeric(10, 2) not null check (price >= 0),
   photo_url text,
   active boolean not null default true,
+  available_in_tava boolean not null default true,
   created_at timestamptz not null default now()
 );
 
@@ -30,6 +31,7 @@ create table if not exists public.orders (
 
 -- pentru bazele deja initializate (create table if not exists nu ii modifica)
 alter table public.orders add column if not exists accepted_at timestamptz;
+alter table public.breads add column if not exists available_in_tava boolean not null default true;
 
 create unique index if not exists orders_code_uq on public.orders (code);
 create index if not exists orders_created_idx on public.orders (created_at desc);
@@ -90,6 +92,7 @@ declare
   v_item jsonb;
   v_bread_id uuid;
   v_qty int;
+  v_la_tava boolean;
   v_bread record;
   v_total numeric(10, 2) := 0;
   v_items jsonb := '[]'::jsonb;
@@ -119,6 +122,7 @@ begin
   loop
     v_bread_id := (v_item ->> 'bread_id')::uuid;
     v_qty := coalesce((v_item ->> 'qty')::int, 0);
+    v_la_tava := coalesce((v_item ->> 'la_tava') = 'true', false);
     if v_qty < 1 or v_qty > 99 then
       raise exception 'CANTITATE_INVALIDA: Cantitatile trebuie sa fie intre 1 si 99.';
     end if;
@@ -126,12 +130,16 @@ begin
     if not found then
       raise exception 'PAINE_SCHIMBATA: O paine din lista nu mai este disponibila. Actualizeaza pagina si reia comanda.';
     end if;
+    if v_la_tava and not v_bread.available_in_tava then
+      raise exception 'TAVA_INVALIDA: % nu poate fi comandata la tava.', v_bread.name;
+    end if;
     v_total := v_total + v_bread.price * v_qty;
     v_items := v_items || jsonb_build_object(
       'bread_id', v_bread.id,
       'name', v_bread.name,
       'price', v_bread.price,
       'qty', v_qty,
+      'la_tava', v_la_tava,
       'row_total', v_bread.price * v_qty
     );
   end loop;
@@ -227,6 +235,18 @@ begin
           cross join jsonb_array_elements(o.items) i
           join breads b on b.id = (i ->> 'bread_id')::uuid
           where o.delivered_at is null
+          group by b.name
+        ) t
+      ),
+      'production_tava', (
+        select coalesce(jsonb_object_agg(t.name, t.qty), '{}'::jsonb)
+        from (
+          select b.name as name, sum((i ->> 'qty')::int) as qty
+          from orders o
+          cross join jsonb_array_elements(o.items) i
+          join breads b on b.id = (i ->> 'bread_id')::uuid
+          where o.delivered_at is null
+            and (i ->> 'la_tava') = 'true'
           group by b.name
         ) t
       ),
@@ -348,7 +368,8 @@ create or replace function public.upsert_bread(
   p_description text default null,
   p_weight_g int default null,
   p_price numeric(10, 2) default null,
-  p_photo_url text default null
+  p_photo_url text default null,
+  p_available_in_tava boolean default null
 )
 returns json
 language plpgsql
@@ -371,13 +392,14 @@ begin
   end if;
 
   if p_id is null then
-    insert into breads (name, description, weight_g, price, photo_url)
+    insert into breads (name, description, weight_g, price, photo_url, available_in_tava)
     values (
       trim(coalesce(p_name, '')),
       coalesce(p_description, ''),
       coalesce(p_weight_g, 0),
       coalesce(p_price, 0),
-      nullif(p_photo_url, '')
+      nullif(p_photo_url, ''),
+      coalesce(p_available_in_tava, true)
     )
     returning * into v_b;
   else
@@ -386,7 +408,8 @@ begin
         description = coalesce(p_description, description),
         weight_g = coalesce(p_weight_g, weight_g),
         price = coalesce(p_price, price),
-        photo_url = coalesce(p_photo_url, photo_url)
+        photo_url = coalesce(p_photo_url, photo_url),
+        available_in_tava = coalesce(p_available_in_tava, available_in_tava)
     where id = p_id
     returning * into v_b;
     if not found then
