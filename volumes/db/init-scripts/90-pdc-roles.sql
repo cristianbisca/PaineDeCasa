@@ -1,6 +1,8 @@
 -- Set passwords for the roles this stack actually uses.
--- Runs during first init (as part of 00-schema setup ordering: after roles exist).
--- Values come from PGPASSWORD (exported to :'pgpass' parameter by the entrypoint).
+-- Run by the db-init service as supabase_admin: in supabase/postgres the initdb
+-- superuser defaults to supabase_admin (ENV POSTGRES_USER), while `postgres`
+-- is only a regular app role.
+-- Values come from POSTGRES_PASSWORD (read into :'pgpass').
 \set pgpass `echo $POSTGRES_PASSWORD`
 
 ALTER USER supabase_admin WITH PASSWORD :'pgpass';

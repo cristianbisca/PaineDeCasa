@@ -39,7 +39,7 @@ services:
     entrypoint:
       - sh
       - -c
-      - psql -v ON_ERROR_STOP=1 -h db -U postgres -f /sql/roles.sql && psql -v ON_ERROR_STOP=1 -h db -U supabase_admin -d postgres -f /sql/db.sql
+      - psql -v ON_ERROR_STOP=1 -h db -U supabase_admin -d postgres -f /sql/roles.sql && psql -v ON_ERROR_STOP=1 -h db -U supabase_admin -d postgres -f /sql/db.sql
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
