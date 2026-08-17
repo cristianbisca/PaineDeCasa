@@ -336,6 +336,39 @@ export default function Home() {
           {error}
         </div>
       ) : null}
+
+      {itemCount > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-10 border-t border-stone-200 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-xl items-center gap-4 px-4 py-4">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm text-stone-500">
+                {itemCount === 1 ? "1 piesa" : `${itemCount} piese`},{" "}
+                {formatLei(total)}
+              </div>
+              {name.trim() === "" ||
+              phone.trim() === "" ||
+              address.trim() === "" ? (
+                <div className="mt-0.5 text-xs text-stone-400">
+                  Completeaza numele, telefonul si adresa.
+                </div>
+              ) : null}
+            </div>
+            <button
+              onClick={submit}
+              disabled={
+                placing ||
+                !config.ordering_open ||
+                name.trim() === "" ||
+                phone.trim() === "" ||
+                address.trim() === ""
+              }
+              className="rounded-2xl bg-amber-600 px-6 py-4 text-lg font-semibold text-white disabled:opacity-40"
+            >
+              {placing ? "Se trimite..." : "Plasează comanda"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
