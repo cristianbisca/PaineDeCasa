@@ -7,8 +7,6 @@ services:
     ports:
       - ${DB_PORT:-4532}:5432
     volumes:
-      - ./volumes/db/init-scripts/90-pdc-roles.sql:/docker-entrypoint-initdb.d/init-scripts/90-pdc-roles.sql
-      - ./volumes/db/migrations/98-paine-de-casa.sql:/docker-entrypoint-initdb.d/migrations/98-paine-de-casa.sql
       - db-data:/var/lib/postgresql/data
       - db-config:/etc/postgresql-custom
     healthcheck:
@@ -38,9 +36,13 @@ services:
     build:
       context: .
       dockerfile: tools/init/Dockerfile
-    entrypoint: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "db", "-U", "supabase_admin", "-d", "postgres", "-f", "/sql/db.sql"]
+    entrypoint:
+      - sh
+      - -c
+      - psql -v ON_ERROR_STOP=1 -h db -U postgres -f /sql/roles.sql && psql -v ON_ERROR_STOP=1 -h db -U supabase_admin -d postgres -f /sql/db.sql
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
